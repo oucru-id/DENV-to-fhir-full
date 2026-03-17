@@ -43,7 +43,7 @@ process CREATE_BLAST_DB {
 }
 
 process SEROTYPE_FROM_READS {
-    publishDir "${params.results_dir}/serotyping", mode: 'copy'
+    publishDir "${params.results_dir}/serotyping", mode: 'copy', pattern: "*.serotype.json"
     
     input:
     tuple val(sample_id), path(reads)
@@ -174,6 +174,5 @@ workflow SEROTYPING {
     
     emit:
     serotype_info = SEROTYPE_FROM_READS.out.serotype_info
-    blast_results = SEROTYPE_FROM_READS.out.blast_results
     blast_db      = blast_db.blast_db
 }
