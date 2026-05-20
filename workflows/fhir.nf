@@ -6,8 +6,9 @@ process CREATE_FHIR {
     publishDir "${params.results_dir}/fhir", mode: 'copy'
 
     input:
-    tuple val(sample_id), path(consensus)
+    tuple val(sample_id), path(consensus), path(coverage)
     path(lineage_files)
+    each path(org_metadata)
 
     output:
     path "*.fhir.json", emit: fhir_output
@@ -26,7 +27,9 @@ process CREATE_FHIR {
     python3 $baseDir/scripts/annotated_to_fhir.py \\
         --input ${consensus} \\
         --output ${sample_id}.fhir.json \\
-        --lineage_dir lineage_data/
+        --lineage_dir lineage_data/ \\
+        --coverage_file ${coverage} \\
+        --organization_metadata ${org_metadata}
 
     cat <<-END_VERSIONS > versions.yml
     "fhir_converter":
@@ -45,9 +48,10 @@ workflow FHIR {
     take:
     fhir_input_ch
     lineage_ch
+    org_ch
 
     main:
-    CREATE_FHIR(fhir_input_ch, lineage_ch)
+    CREATE_FHIR(fhir_input_ch, lineage_ch, org_ch)
 
     emit:
     fhir_output = CREATE_FHIR.out.fhir_output
