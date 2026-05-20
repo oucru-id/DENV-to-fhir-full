@@ -37,7 +37,7 @@ process CREATE_DENGUE_REPORTS {
     publishDir "${params.results_dir}/reports", mode: 'copy'
     
     input:
-    tuple val(sample_id), path(serotype_json), path(genotype_json), path(consensus)
+    tuple val(sample_id), path(serotype_json), path(genotype_json), path(consensus), path(coverage)
     
     output:
     path "${sample_id}_dengue_report.txt", emit: dengue_report
@@ -57,6 +57,7 @@ process CREATE_DENGUE_REPORTS {
         --serotype_json ${serotype_json} \
         \$GENOTYPE_ARG \
         --consensus ${consensus} \
+        --coverage_file ${coverage} \
         --output ${sample_id}_dengue_report.txt
     
     cat <<-END_VERSIONS > versions.yml
