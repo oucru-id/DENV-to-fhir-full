@@ -116,8 +116,9 @@ process generate_consensus {
     tuple val(sample_id), path("aligned.bam"), path(reference)
 
     output:
-    tuple val(sample_id), path("${sample_id}_consensus.fasta"), emit: consensus
-    tuple val(sample_id), path("${sample_id}.vcf.gz"), path("${sample_id}.vcf.gz.tbi"), emit: vcf 
+    tuple val(sample_id), path("${sample_id}_consensus.fasta"),                        emit: consensus
+    tuple val(sample_id), path("${sample_id}.vcf.gz"), path("${sample_id}.vcf.gz.tbi"), emit: vcf
+    tuple val(sample_id), path("${sample_id}.coverage.txt"),                          emit: coverage_stats
 
     script:
     """
@@ -137,6 +138,8 @@ process generate_consensus {
     bcftools consensus -f ${reference} ${sample_id}.vcf.gz > temp_consensus.fasta
 
     sed "s/^>.*/>${sample_id}_consensus/" temp_consensus.fasta > ${sample_id}_consensus.fasta
+
+    samtools coverage aligned.bam > ${sample_id}.coverage.txt
     """
 }
 
@@ -157,4 +160,5 @@ workflow NANOPORE {
     qc_report = qc_clean.qc_report
     consensus = consensus_out.consensus
     vcf       = consensus_out.vcf
+    coverage  = consensus_out.coverage_stats
 }
