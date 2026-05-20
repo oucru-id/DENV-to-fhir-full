@@ -2,41 +2,51 @@
 
 nextflow.enable.dsl = 2
 
-process CREATE_BLAST_DB {
+process CREATE_MINIMAP2_INDEX {
     input:
     path(references)
     
     output:
-    path("denv_db*"), emit: blast_db
+    path("denv_ref.mmi"),                       emit: index
+    path("all_denv_references_tagged.fasta"),    emit: tagged_fasta
     
     script:
     """
     if [ \$(ls -1 ${references} 2>/dev/null | wc -l) -eq 0 ]; then
+        echo "No reference files found"
         exit 1
     fi
-    
-    cat ${references} > all_denv_references.fasta
-    
-    if [ ! -s all_denv_references.fasta ]; then
+
+    cat ${references} > all_denv_references_raw.fasta
+
+    if [ ! -s all_denv_references_raw.fasta ]; then
         echo "Combined reference file is empty"
         exit 1
     fi
-    
-    if ! grep -q "^>" all_denv_references.fasta; then
+
+    if ! grep -q "^>" all_denv_references_raw.fasta; then
         echo "No FASTA headers found in reference file"
         exit 1
     fi
-    
-    SEQ_COUNT=\$(grep -c "^>" all_denv_references.fasta)
-    
+
+    SEQ_COUNT=\$(grep -c "^>" all_denv_references_raw.fasta)
     if [ \$SEQ_COUNT -lt 4 ]; then
         echo "WARNING: Only \$SEQ_COUNT reference sequences found"
     fi
-    
-    makeblastdb -in all_denv_references.fasta -dbtype nucl -out denv_db
-    
-    if [ ! -f denv_db.ndb ] && [ ! -f denv_db.ndb ]; then
-        echo "BLAST database creation failed"
+
+    sed \\
+        's/>NC_001477\\.1/>DENV1|NC_001477.1/g;
+         s/>NC_001474\\.2/>DENV2|NC_001474.2/g;
+         s/>NC_001475\\.2/>DENV3|NC_001475.2/g;
+         s/>NC_002640\\.1/>DENV4|NC_002640.1/g;
+         s/>JF262780\\.1/>DENV4|JF262780.1/g;
+         s/>EF105380\\.1/>DENV2_SYLVATIC|EF105380.1/g' \\
+        all_denv_references_raw.fasta > all_denv_references_tagged.fasta
+
+    minimap2 -d denv_ref.mmi all_denv_references_tagged.fasta
+
+    if [ ! -s denv_ref.mmi ]; then
+        echo "minimap2 index creation failed"
         exit 1
     fi
     """
@@ -47,117 +57,102 @@ process SEROTYPE_FROM_READS {
     
     input:
     tuple val(sample_id), path(reads)
-    path(blast_db)
+    path(minimap2_index)
     
     output:
-    tuple val(sample_id), path("${sample_id}.serotype.json"), emit: serotype_info
-    tuple val(sample_id), path("${sample_id}.quick_blast.txt"), emit: blast_results
+    tuple val(sample_id), path("${sample_id}.serotype.json"),   emit: serotype_info
+    tuple val(sample_id), path("${sample_id}.minimap2.paf"),    emit: minimap2_paf
     
     script:
-    def read_file = reads instanceof List ? reads[0] : reads
+    def is_illumina = reads instanceof List
+    def read_file   = is_illumina ? reads[0] : reads
+    def mm2_preset  = is_illumina ? "sr" : "map-ont"
     """
     create_fallback_json() {
         echo "{\\"sample_id\\": \\"${sample_id}\\", \\"serotype\\": \\"unknown\\", \\"confidence\\": \\"none\\", \\"note\\": \\"\$1\\"}" > ${sample_id}.serotype.json
     }
 
     if [ ! -s "${read_file}" ]; then
-        touch ${sample_id}.quick_blast.txt
+        touch ${sample_id}.minimap2.paf
         create_fallback_json "empty_input_file"
         exit 0
     fi
-    
+
     if [[ "${read_file}" == *.gz ]]; then
-        FIRST_LINE=\$(zcat ${read_file} | head -n 1)
+        FIRST_LINE=\$(zcat "${read_file}" | head -n 1)
     else
-        FIRST_LINE=\$(head -n 1 ${read_file})
+        FIRST_LINE=\$(head -n 1 "${read_file}")
     fi
-    
+
     if [[ ! "\$FIRST_LINE" =~ ^@ ]]; then
-        touch ${sample_id}.quick_blast.txt
+        touch ${sample_id}.minimap2.paf
         create_fallback_json "invalid_fastq_header"
         exit 0
     fi
-    
-    INITIAL_READS=300000
-    MAX_READS=500000  
-    
+
+    INITIAL_READS=60000
+    MAX_READS=180000
+
     for ATTEMPT in 1 2 3; do
         CURRENT_READS=\$((INITIAL_READS * ATTEMPT * ATTEMPT))
         if [ \$CURRENT_READS -gt \$MAX_READS ]; then
             CURRENT_READS=\$MAX_READS
         fi
-        
+
         LINES=\$((CURRENT_READS * 4))
-        
+
         if [[ "${read_file}" == *.gz ]]; then
-            zcat ${read_file} | head -n \$LINES > subset.fastq 2>/dev/null || {
-                zcat ${read_file} > subset.fastq
-            }
+            zcat "${read_file}" | head -n \$LINES > subset.fastq 2>/dev/null || zcat "${read_file}" > subset.fastq
         else
-            head -n \$LINES ${read_file} > subset.fastq 2>/dev/null || {
-                cat ${read_file} > subset.fastq
-            }
+            head -n \$LINES "${read_file}" > subset.fastq 2>/dev/null || cat "${read_file}" > subset.fastq
         fi
-        
+
         ACTUAL_READS=\$(( \$(wc -l < subset.fastq) / 4 ))
-        echo "Extracted \$ACTUAL_READS reads for analysis"
-        
+        echo "Attempt \$ATTEMPT: extracted \$ACTUAL_READS reads"
+
         if [ \$ACTUAL_READS -eq 0 ]; then
-            touch ${sample_id}.quick_blast.txt
+            touch ${sample_id}.minimap2.paf
             create_fallback_json "no_reads_extracted"
             exit 0
         fi
-        
-        awk 'NR%4==1{printf ">%s\\n", substr(\$0,2)} NR%4==2{print}' subset.fastq > subset.fasta
-        
-        FASTA_SEQS=\$(grep -c "^>" subset.fasta || echo 0)
-        
-        if [ \$FASTA_SEQS -eq 0 ]; then
-            continue
-        fi
-        
-        blastn -query subset.fasta \\
-            -db denv_db \\
-            -out ${sample_id}.quick_blast.txt \\
-            -outfmt "6 qseqid sseqid pident length mismatch gapopen qstart qend sstart send evalue bitscore stitle" \\
-            -max_target_seqs 1 \\
-            -evalue 1e-3 \\
-            -word_size 11 \\
-            -num_threads ${task.cpus} || touch ${sample_id}.quick_blast.txt
-        
+
+        minimap2 -x ${mm2_preset} --secondary=no -t ${task.cpus} \\
+            denv_ref.mmi subset.fastq > ${sample_id}.minimap2.paf || touch ${sample_id}.minimap2.paf
+
         python3 $baseDir/scripts/serotype_classification.py \\
-            --blast_results ${sample_id}.quick_blast.txt \\
+            --blast_results ${sample_id}.minimap2.paf \\
+            --format paf \\
             --sample_id ${sample_id} \\
             --total_reads \$ACTUAL_READS \\
             --output ${sample_id}.serotype.json
-        
+
         if [ ! -f "${sample_id}.serotype.json" ]; then
             echo "ERROR: Classification failed"
             create_fallback_json "classification_script_failed"
             break
         fi
-        
+
         CONFIDENCE=\$(python3 -c "
-import json, sys
+import json
 try:
-    with open('${sample_id}.serotype.json', 'r') as f:
+    with open('${sample_id}.serotype.json') as f:
         data = json.load(f)
     print(data.get('confidence', 'low'))
-except Exception as e:
+except Exception:
     print('low')
 ")
-                
+
         if [[ "\$CONFIDENCE" == "high" ]] || [[ "\$CONFIDENCE" == "medium" ]] || [[ \$CURRENT_READS -ge \$MAX_READS ]]; then
             break
         fi
-        
-        echo "Low confidence (\$CONFIDENCE)"
+
+        echo "Low confidence (\$CONFIDENCE), retrying with more reads"
     done
-    
+
     if [ ! -f "${sample_id}.serotype.json" ]; then
         create_fallback_json "process_failed"
     fi
-    
+
     cat ${sample_id}.serotype.json
     """
 }
@@ -167,12 +162,12 @@ workflow SEROTYPING {
     reads_ch
     
     main:
-    references = Channel.fromPath("${params.reference_dir}/*.fasta").collect()
-    blast_db = CREATE_BLAST_DB(references)
+    references     = Channel.fromPath("${params.reference_dir}/*.fasta").collect()
+    minimap2_index = CREATE_MINIMAP2_INDEX(references)
     
-    SEROTYPE_FROM_READS(reads_ch, blast_db.blast_db)
+    SEROTYPE_FROM_READS(reads_ch, minimap2_index.index)
     
     emit:
-    serotype_info = SEROTYPE_FROM_READS.out.serotype_info
-    blast_db      = blast_db.blast_db
+    serotype_info  = SEROTYPE_FROM_READS.out.serotype_info
+    minimap2_index = minimap2_index.index
 }
