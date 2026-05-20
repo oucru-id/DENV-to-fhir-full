@@ -41,8 +41,28 @@ def get_sequence_stats(fasta_file):
     except Exception as e:
         return {"length": 0, "n_count": 0, "gc_content": 0, "coverage": 0}
 
-def generate_dengue_report(sample_id, serotype_data, genotype_data, consensus_file, output_file):
+def get_coverage_stats(coverage_file):
+    try:
+        if not coverage_file or not os.path.exists(coverage_file):
+            return {"breadth": None, "mean_depth": None}
+        with open(coverage_file) as f:
+            for line in f:
+                if line.startswith('#'):
+                    continue
+                parts = line.strip().split('\t')
+                if len(parts) >= 7:
+                    return {
+                        "breadth":    float(parts[5]),
+                        "mean_depth": float(parts[6])
+                    }
+        return {"breadth": None, "mean_depth": None}
+    except Exception:
+        return {"breadth": None, "mean_depth": None}
+
+
+def generate_dengue_report(sample_id, serotype_data, genotype_data, consensus_file, output_file, coverage_file=None):
     seq_stats = get_sequence_stats(consensus_file)
+    cov_stats = get_coverage_stats(coverage_file)
     
     with open(output_file, 'w') as f:
         f.write("="*80 + "\n")
@@ -54,7 +74,10 @@ def generate_dengue_report(sample_id, serotype_data, genotype_data, consensus_fi
         f.write("SEQUENCE QUALITY SUMMARY:\n")
         f.write("-" * 50 + "\n")
         f.write(f"Consensus length: {seq_stats['length']:,} bp\n")
-        f.write(f"Genome coverage: {seq_stats['coverage']:.1f}%\n")
+        f.write(f"Sequence completeness (non-N bases): {seq_stats['coverage']:.1f}%\n")
+        if cov_stats['breadth'] is not None:
+            f.write(f"Genome coverage (breadth \u22651x): {cov_stats['breadth']:.1f}%\n")
+            f.write(f"Mean sequencing depth: {cov_stats['mean_depth']:.1f}x\n")
         f.write(f"Ambiguous bases (N): {seq_stats['n_count']:,} ({seq_stats['n_percentage']:.1f}%)\n")
         f.write(f"GC content: {seq_stats['gc_content']:.1f}%\n\n")
         
@@ -106,6 +129,7 @@ def main():
     parser.add_argument('--serotype_json', required=True, help='Serotype JSON file')
     parser.add_argument('--genotype_json', help='Genotype JSON file (optional)')
     parser.add_argument('--consensus', required=True, help='Consensus sequence FASTA file')
+    parser.add_argument('--coverage_file', required=False, help='samtools coverage output file')
     parser.add_argument('--output', required=True, help='Output report file')
     
     args = parser.parse_args()
@@ -118,7 +142,8 @@ def main():
         serotype_data,
         genotype_data,
         args.consensus,
-        args.output
+        args.output,
+        coverage_file=args.coverage_file
     )
     
 if __name__ == '__main__':
