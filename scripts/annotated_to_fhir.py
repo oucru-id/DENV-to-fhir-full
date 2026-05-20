@@ -3,24 +3,35 @@
 import argparse
 import json
 import os
+import sys
 import uuid
 import gzip
 from datetime import datetime, timezone
 from Bio import SeqIO
+
+sys.path.insert(0, os.path.dirname(__file__))
+from clinical_metadata_parser import load_organization_metadata
 
 def main():
     parser = argparse.ArgumentParser(description='Convert Dengue analysis results to FHIR observations')
     parser.add_argument('--input', required=True, help='Consensus FASTA file')
     parser.add_argument('--output', required=True, help='Output FHIR JSON file')
     parser.add_argument('--lineage_dir', required=True, help='Directory with lineage JSON files')
+    parser.add_argument('--coverage_file', required=False, help='samtools coverage output file')
+    parser.add_argument('--organization_metadata', required=False, help='Path to organization metadata CSV file')
     
     args = parser.parse_args()
+
+    org_data = {}
+    if args.organization_metadata and os.path.exists(args.organization_metadata):
+        org_data = load_organization_metadata(args.organization_metadata)
     
     sample_id = extract_sample_id(args.input)
     seq_data = read_consensus(args.input)
+    coverage_stats = read_coverage_stats(args.coverage_file)
     
     serotype_data, genotype_data, nextclade_data = read_lineage_data(args.lineage_dir, sample_id)
-    fhir_bundle = create_fhir_observations(sample_id, seq_data, serotype_data, genotype_data, nextclade_data)
+    fhir_bundle = create_fhir_observations(sample_id, seq_data, serotype_data, genotype_data, nextclade_data, coverage_stats, org_data)
     
     with open(args.output, 'w') as f:
         json.dump(fhir_bundle, f, indent=2)
@@ -43,6 +54,25 @@ def read_consensus(fasta_file):
                 }
     except:
         return {'sequence': '', 'length': 0, 'n_percentage': 0, 'gc_percentage': 0}
+
+def read_coverage_stats(coverage_file):
+    try:
+        if not coverage_file or not os.path.exists(coverage_file):
+            return {"breadth": None, "mean_depth": None}
+        with open(coverage_file) as f:
+            for line in f:
+                if line.startswith('#'):
+                    continue
+                parts = line.strip().split('\t')
+                if len(parts) >= 7:
+                    return {
+                        "breadth":    float(parts[5]),
+                        "mean_depth": float(parts[6])
+                    }
+        return {"breadth": None, "mean_depth": None}
+    except Exception:
+        return {"breadth": None, "mean_depth": None}
+
 
 def read_lineage_data(lineage_dir, sample_id):
     serotype_data = {}
@@ -83,7 +113,9 @@ def read_lineage_data(lineage_dir, sample_id):
                 
     return serotype_data, genotype_data, nextclade_mutations
 
-def create_fhir_observations(sample_id, seq_data, serotype_data, genotype_data, nextclade_mutations):
+def create_fhir_observations(sample_id, seq_data, serotype_data, genotype_data, nextclade_mutations, coverage_stats=None, org_data=None):
+    org_data = org_data or {}
+    org_id = org_data.get('org_id', 'unknown-org')
     timestamp = datetime.now(timezone.utc).isoformat()
     bundle = {
         "resourceType": "Bundle",
@@ -134,7 +166,7 @@ def create_fhir_observations(sample_id, seq_data, serotype_data, genotype_data, 
         "subject": {"reference": f"Patient/{sample_id}-patient"},
         "specimen": {"reference": f"Specimen/{sample_id}-specimen"},
         "effectiveDateTime": timestamp,
-        "performer": [{"reference": "Organization/100007732"}]
+        "performer": [{"reference": f"Organization/{org_id}"}]
     }
     bundle["entry"].append({"fullUrl": f"urn:uuid:{uuid.uuid4()}", "resource": classification_obs})
 
@@ -179,19 +211,56 @@ def create_fhir_observations(sample_id, seq_data, serotype_data, genotype_data, 
                     }
                 },
                 {
-                    "code": {"text": "Completeness (N content)"},
+                    "code": {"text": "Sequence Completeness"},
+                    "valueQuantity": {
+                        "value": round(100.0 - seq_data['n_percentage'], 2),
+                        "unit": "%",
+                        "system": "http://unitsofmeasure.org",
+                        "code": "%"
+                    }
+                },
+                {
+                    "code": {"text": "Ambiguous bases (N content)"},
                     "valueQuantity": {
                         "value": round(seq_data['n_percentage'], 2),
                         "unit": "%",
                         "system": "http://unitsofmeasure.org",
                         "code": "%"
                     }
+                },
+                {
+                    "code": {"text": "GC Content"},
+                    "valueQuantity": {
+                        "value": round(seq_data['gc_percentage'], 2),
+                        "unit": "%",
+                        "system": "http://unitsofmeasure.org",
+                        "code": "%"
+                    }
                 }
-            ],
+            ] + ([
+                {
+                    "code": {"text": "Genome Coverage"},
+                    "valueQuantity": {
+                        "value": round(coverage_stats['breadth'], 2),
+                        "unit": "%",
+                        "system": "http://unitsofmeasure.org",
+                        "code": "%"
+                    }
+                },
+                {
+                    "code": {"text": "Mean Sequencing Depth"},
+                    "valueQuantity": {
+                        "value": round(coverage_stats['mean_depth'], 2),
+                        "unit": "x",
+                        "system": "http://unitsofmeasure.org",
+                        "code": "{fold}"
+                    }
+                }
+            ] if coverage_stats and coverage_stats.get('breadth') is not None else []),
             "subject": {"reference": f"Patient/{sample_id}-patient"},
             "specimen": {"reference": f"Specimen/{sample_id}-specimen"},
             "effectiveDateTime": timestamp,
-            "performer": [{"reference": "Organization/100007732"}]
+            "performer": [{"reference": f"Organization/{org_id}"}]
         }
         bundle["entry"].append({"fullUrl": f"urn:uuid:{uuid.uuid4()}", "resource": consensus_obs})
 
@@ -270,7 +339,7 @@ def create_fhir_observations(sample_id, seq_data, serotype_data, genotype_data, 
             "subject": {"reference": f"Patient/{sample_id}-patient"},
             "specimen": {"reference": f"Specimen/{sample_id}-specimen"},
             "effectiveDateTime": timestamp,
-            "performer": [{"reference": "Organization/100007732"}]
+            "performer": [{"reference": f"Organization/{org_id}"}]
         }
         bundle["entry"].append({"fullUrl": f"urn:uuid:{uuid.uuid4()}", "resource": variant_obs})
 
