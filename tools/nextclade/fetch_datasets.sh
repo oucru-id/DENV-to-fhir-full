@@ -1,9 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Pre-fetch all 4 Dengue Nextclade datasets for offline/reproducible DENVtoFHIR runs.
-# Usage: tools/nextclade/fetch_datasets.sh [output_dir] [optional_tag]
-
 OUT_DIR="${1:-db/nextclade}"
 TAG="${2:-}"
 TAG_ARG=()
