@@ -7,7 +7,7 @@ include { BUILD_CONSENSUS    } from '../../modules/local/build_consensus'
 
 workflow CONSENSUS_NANOPORE {
     take:
-    assigned    // [meta, reads, ref_fasta, serotype]
+    assigned   
     primer_bed
 
     main:
