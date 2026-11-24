@@ -1,151 +1,70 @@
-# Pan-Serotype Dengue Virus Genomics to FHIR Pipeline (DENVtoFHIR)
+# Dengue Virus Genomic Analysis to FHIR Pipeline (DENVtoFHIR)
 
-A platform-agnostic Nextflow pipeline for Dengue virus genomic analysis from raw sequencing reads,
-producing HL7 FHIR R4 genomics bundles (IG v3.0.0). [Full documentation](https://denv-pipeline-docs.readthedocs.io/)
+A Nextflow pipeline for Dengue virus (DENV-1 to DENV-4) amplicon/WGS genomic analysis from raw sequencing reads or consensus FASTAs. It performs read QC, optional host depletion, panel-based serotyping with mixed-serotype co-infection detection, amplicon primer trimming, depth-masked haploid consensus reconstruction, Nextclade genotyping/lineage classification, and exports results as HL7 FHIR R4 Genomics Reporting resources.
 
-## Key Features
+## Key features
 
-- **Multi-platform:** Illumina paired-end short reads and Oxford Nanopore (ONT) long reads.
-- **Serotyping & Genotyping:** Pan-serotype classification (DENV-1–4) with genotype and lineage resolution via Nextclade.
-- **Mutation Detection:** Amino acid substitution identification from consensus sequences.
-- **Quality Control:** Per-sample FastQC reports aggregated by MultiQC.
-- **FHIR Compliance:** HL7 FHIR R4 bundles with Classification, Consensus Sequence, Variant, and DiagnosticReport resources.
-- **Clinical Integration:** Merges genomic results with patient, organization, and practitioner metadata.
+- **Multi-platform input**: Illumina paired-end amplicon/WGS reads, Oxford Nanopore reads, or pre-built consensus FASTAs via `--input samplesheet.csv` (or legacy `--reads_dir`).
+- **Serotyping with co-infection detection**: Maps reads against the 6-genome reference panel (`data/references/panel.tsv`, DENV-1..4 + sylvatic DENV-2/4), flags suspected mixed-serotype co-infections, and never silently falls back to DENV-1 on unmapped samples.
+- **Amplicon-aware haploid consensus with low-depth masking**:
+  - Optional amplicon primer trimming via `ivar trim` (`--primer_bed`).
+  - Illumina haploid calling with uncapped depth (`bcftools mpileup -d 1000000 | bcftools call --ploidy 1 -mv`) and DP/QUAL/AF filters (eliminating IUPAC ambiguity inflation).
+  - Nanopore variant calling via `medaka`.
+  - Per-base coverage via `mosdepth` masks all positions below `--consensus_min_depth` (default `10`) with `N`, ensuring reported completeness reflects real sequencing breadth.
+- **Nextclade genotyping with QC gating**: Downloads each needed serotype dataset (`community/v-gen-lab/dengue/denv1..4`) once per run (or uses pre-fetched offline datasets via `--nextclade_dir`). Samples below `--min_completeness` (default `0.80`) or with Nextclade QC `bad` are reported as `Indeterminate` with explicit reasons.
+- **Three-layer FHIR R4 output** (aligned with TBtoFHIR 2.0 and KPtoFHIR 2.0):
+  - `fhir/genomic/<id>.genomic.fhir.json`: PHI-free `collection` Bundle (DiagnosticReport, Classification, Region-Studied QC, embedded Consensus Sequence, Variant Observations including AA substitutions/deletions/insertions, Device, Provenance).
+  - `fhir/clinical/` (with `--patient_metadata`): Patient, Specimen, Encounter, ServiceRequest, Organization, Practitioner, PractitionerRole.
+  - `fhir/bundle/<id>.bundle.fhir.json` (with `--patient_metadata`): self-contained FHIR `transaction` Bundle per sample.
+  - Supports `--fhir_profile generic` (default, HL7 Genomics Reporting IG 3.0.0) and `--fhir_profile satusehat` (Indonesian Ministry of Health Kemkes extensions/identifiers).
+  - Optional HL7 FHIR validation (`--skip_fhir_validation false`) and gated upload (`--fhir_server_url`) using Nextflow secrets (`DENVFHIR_CLIENT_ID`, `DENVFHIR_CLIENT_SECRET`, optional `DENVFHIR_API_KEY`).
 
-## Installation
-
-### Setup
-
-```bash
-git clone https://github.com/oucru-id/DENV-to-fhir-full.git
-cd dengue-to-fhir-full
-```
-
-### Dependencies
+## Quick start
 
 ```bash
-# Install Nextflow
-curl -s https://get.nextflow.io | bash
+# Wiring check (no containers needed)
+nextflow run . -profile test_stub -stub-run
 
-# Verify
-nextflow -v
+# End-to-end on the 4 canonical DENV RefSeq genomes (Docker)
+nextflow run . -profile test_fasta,docker
+
+# Amplicon Illumina samplesheet (Docker)
+nextflow run . -profile docker \
+  --input samplesheet.csv \
+  --outdir results \
+  --skip_host_removal true \
+  --primer_bed primers/
 ```
 
-Required tools: `minimap2`, `samtools`, `bwa-mem2`, `trimmomatic`, `chopper`, `hostile`, `nextclade`, `fastqc`, `multiqc`, `python3` (with `biopython`, `pandas`).
+## Samplesheet format
 
-## Directory Structure
-
-```
-denv-to-fhir-full
-├── main.nf                             # Main workflow
-├── nextflow.config                     # Configuration and parameters
-├── workflows/
-│   ├── illumina.nf                     # Illumina sub-workflow
-│   ├── nanopore.nf                     # Nanopore sub-workflow
-│   ├── trimming.nf                     # Read trimming
-│   ├── host_removal.nf                 # Host read removal
-│   ├── serotyping.nf                   # Serotype classification
-│   ├── genotyping.nf                   # Genotype classification
-│   ├── fhir.nf                         # FHIR Bundle generation
-│   ├── validate_fhir.nf                # FHIR validation
-│   ├── merge_clinical_data.nf          # Clinical metadata merge
-│   ├── upload_fhir.nf                  # FHIR server upload
-│   ├── report.nf                       # QC and sample report generation
-│   └── utils.nf                        # Utility functions
-├── scripts/
-│   ├── annotated_to_fhir.py            # Consensus-to-FHIR converter
-│   ├── clinical_metadata_parser.py     # Patient/org/practitioner parser
-│   ├── serotype_classification.py      # Serotype classifier
-│   ├── generate_dengue_report.py       # Per-sample report generator
-│   ├── get_access_token.py             # FHIR access token retriever
-│   ├── upload_fhir.py                  # FHIR upload script
-│   ├── merge_clinical_fhir.py          # FHIR genomics + clinical data merger
-│   └── get_versions.py                 # Software version collector
-├── data/
-│   ├── NGS/                            # Input FASTQ files
-│   ├── references/                     # Reference genomes (DENV-1–4 & Sylvatic)
-│   ├── patient_clinical_metadata.csv   # Patient metadata
-│   ├── organization_metadata.csv       # Organization metadata
-│   └── practitioner_metadata.csv       # Practitioner metadata
-└── tools/
-    └── fhir-validator.jar              # HL7 FHIR validator
+```csv
+sample,platform,fastq_1,fastq_2,fasta
+DENV001,illumina,/data/DENV001_1.fastq.gz,/data/DENV001_2.fastq.gz,
+DENV002,ont,/data/DENV002.fastq.gz,,
+DENV003,fasta,,,/data/DENV003.fasta
 ```
 
-## Input Data
-
-### Illumina Reads
-
-Place paired-end FASTQ files in `data/NGS/`:
-
-```
-data/NGS/SAMPLE_1_illumina.fastq.gz
-data/NGS/SAMPLE_2_illumina.fastq.gz
-```
-
-### Nanopore Reads
-
-Place single-end FASTQ files in `data/NGS/`:
-
-```
-data/NGS/SAMPLE_ont.fastq.gz
-```
-
-### Metadata
-
-Fill in the three CSV files under `data/` with appropriate metadata for patients, organizations, and practitioners.
-
-## Usage
-
-### Get Access Token (FHIR Upload)
-
-```bash
-python scripts/get_access_token.py
-```
-
-### Basic Run
-
-```bash
-nextflow run main.nf
-```
-
-### Run with FHIR Upload
-
-> Get the access token first before running with upload.
-
-```bash
-nextflow run main.nf \
-  --fhir_server_url "https://<BASE_URL>/fhir"
-```
-
-## Output Structure
+## Output structure
 
 ```
 results/
+├── pipeline_info/          execution report, timeline, trace, DAG, software_versions.yml
 ├── qc/
-│   └── multiqc_report.html             # Aggregated QC report
-├── consensus/
-│   └── *.consensus.fasta               # Per-sample consensus sequences
-├── serotyping/
-│   └── *.serotype.json                 # Per-sample serotype results
-├── genotyping/
-│   └── *.genotype_lineage.json         # Per-sample genotype/lineage results
-├── fhir/
-│   └── *.fhir.json                     # FHIR genomics bundles
-├── fhir_merged/
-│   └── *.merged.fhir.json              # FHIR bundles with clinical data
-├── fhir_validated/
-│   └── *.validation.txt                # FHIR validation results
-├── fhir_upload/
-│   └── *.upload.json                   # FHIR upload results
-├── reports/
-│   └── *.summary_report.txt            # Per-sample summary reports
-├── runningstat/
-│   ├── execution.html                  # Nextflow execution report
-│   ├── timeline.html                   # Timeline report
-│   └── dag.html                        # Workflow DAG
-└── software_versions.yml               # Software version manifest
+│   ├── fastqc/             FastQC reports (Illumina)
+│   ├── nanoplot/           NanoStats & NanoPlot HTML (ONT)
+│   ├── host_removal/       Hostile logs (when enabled)
+│   ├── coverage/           <id>.coverage.json, <id>.mask.bed, mosdepth outputs
+│   └── multiqc/            multiqc_report.html
+├── serotyping/             <id>.serotype.json
+├── variants/               <id>.filtered.vcf.gz(.tbi)
+├── consensus/              <id>.consensus.fasta
+├── genotyping/             <id>.nextclade.csv, <id>.nextclade.json, <id>.genotype.json
+├── reports/                <id>.summary_report.txt
+└── fhir/
+    ├── genomic/            <id>.genomic.fhir.json           (PHI-free, includes consensus sequence)
+    ├── clinical/           clinical resources, clinical_summary.tsv   (personal data)
+    ├── bundle/             <id>.bundle.fhir.json, link_summary.tsv    (personal data)
+    ├── validation/         validation_summary.tsv, validation_<n>.json (when validation enabled)
+    └── upload/             <id>.bundle.upload.json
 ```
-
-## Support
-
-[GitHub Issues](https://github.com/oucru-id/DENV-to-fhir-full/issues)

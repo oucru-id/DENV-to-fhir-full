@@ -1,0 +1,339 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://raw.githubusercontent.com/oucru-id/DENV-to-fhir-full/main/nextflow_schema.json",
+    "title": "oucru-id/DENV-to-fhir-full pipeline parameters",
+    "description": "Dengue virus WGS/amplicon sequencing to serotyping, masked consensus, Nextclade genotyping and HL7 FHIR Genomics reports",
+    "type": "object",
+    "$defs": {
+        "input_output_options": {
+            "title": "Input/output options",
+            "type": "object",
+            "fa_icon": "fas fa-terminal",
+            "description": "Give samples with --input, or with --reads_dir.",
+            "properties": {
+                "input": {
+                    "type": "string",
+                    "format": "file-path",
+                    "exists": true,
+                    "schema": "assets/schema_input.json",
+                    "mimetype": "text/csv",
+                    "pattern": "^\\S+\\.csv$",
+                    "description": "Samplesheet CSV with columns sample,platform,fastq_1,fastq_2,fasta (platform illumina, ont or fasta)."
+                },
+                "reads_dir": {
+                    "type": "string",
+                    "format": "directory-path",
+                    "exists": true,
+                    "description": "Legacy input: directory of <id>_{1,2}_illumina.fastq.gz, <id>_ont.fastq.gz, or <id>.fasta files."
+                },
+                "outdir": {
+                    "type": "string",
+                    "format": "directory-path",
+                    "default": "results",
+                    "description": "Output directory."
+                },
+                "results_dir": {
+                    "type": "string",
+                    "hidden": true,
+                    "description": "Removed in 2.0.0; use --outdir."
+                }
+            }
+        },
+        "reference_options": {
+            "title": "Reference data",
+            "type": "object",
+            "fa_icon": "fas fa-book",
+            "properties": {
+                "reference_dir": {
+                    "type": "string",
+                    "format": "directory-path",
+                    "exists": true,
+                    "description": "Directory containing Dengue serotype reference FASTA files."
+                },
+                "reference_panel": {
+                    "type": "string",
+                    "format": "file-path",
+                    "exists": true,
+                    "description": "TSV mapping reference accession, FASTA filename, serotype, sylvatic flag, and Nextclade dataset."
+                }
+            }
+        },
+        "read_processing_options": {
+            "title": "Read QC, host removal, and amplicon consensus",
+            "type": "object",
+            "fa_icon": "fas fa-dna",
+            "properties": {
+                "trimmomatic_jar": {
+                    "type": "string",
+                    "format": "file-path",
+                    "description": "Path to trimmomatic.jar when not using a container/conda profile."
+                },
+                "nanopore_min_q": {
+                    "type": "integer",
+                    "default": 10,
+                    "minimum": 1,
+                    "description": "chopper minimum read quality for Nanopore reads."
+                },
+                "nanopore_min_l": {
+                    "type": "integer",
+                    "default": 200,
+                    "minimum": 20,
+                    "description": "chopper minimum read length (bp) for Nanopore reads."
+                },
+                "skip_host_removal": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Skip human host read depletion with Hostile."
+                },
+                "hostile_index": {
+                    "type": "string",
+                    "format": "directory-path",
+                    "exists": true,
+                    "description": "Pre-staged Hostile index cache directory (for offline/reproducible host removal)."
+                },
+                "hostile_index_name": {
+                    "type": "string",
+                    "default": "human-t2t-hla",
+                    "description": "Hostile index name."
+                },
+                "primer_bed": {
+                    "type": "string",
+                    "format": "path",
+                    "exists": true,
+                    "description": "Amplicon primer BED file, or directory containing per-serotype BED files (e.g. DENV-1.bed .. DENV-4.bed), for ivar trim."
+                },
+                "ivar_min_quality": {
+                    "type": "integer",
+                    "default": 20,
+                    "minimum": 0,
+                    "description": "ivar trim minimum base quality threshold (-q)."
+                },
+                "ivar_min_length": {
+                    "type": "integer",
+                    "default": 30,
+                    "minimum": 1,
+                    "description": "ivar trim minimum read length after trimming (-m)."
+                },
+                "ivar_include_no_primer": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Pass -e to ivar trim to retain reads with no primer match."
+                },
+                "medaka_model": {
+                    "type": "string",
+                    "description": "Medaka model for ONT variant calling (required when ONT samples are present)."
+                },
+                "medaka_batch_size": {
+                    "type": "integer",
+                    "default": 100,
+                    "minimum": 1,
+                    "description": "Medaka inference batch size."
+                },
+                "consensus_min_depth": {
+                    "type": "integer",
+                    "default": 10,
+                    "minimum": 1,
+                    "description": "Minimum read depth required to call a consensus base; positions below this depth are masked with N."
+                },
+                "consensus_min_af": {
+                    "type": "number",
+                    "default": 0.5,
+                    "minimum": 0.5,
+                    "maximum": 1.0,
+                    "description": "Minimum alternate allele fraction required for a variant to enter the haploid consensus."
+                },
+                "variant_min_quality": {
+                    "type": "number",
+                    "default": 20,
+                    "minimum": 0,
+                    "description": "Minimum VCF QUAL score for consensus variant inclusion."
+                }
+            }
+        },
+        "typing_options": {
+            "title": "Serotyping and Nextclade genotyping",
+            "type": "object",
+            "fa_icon": "fas fa-sitemap",
+            "properties": {
+                "min_serotype_reads": {
+                    "type": "integer",
+                    "default": 10,
+                    "minimum": 1,
+                    "description": "Minimum mapped DENV reads required to call a serotype."
+                },
+                "coinfection_min_fraction": {
+                    "type": "number",
+                    "default": 0.10,
+                    "minimum": 0.01,
+                    "maximum": 0.50,
+                    "description": "Flag possible mixed-serotype co-infection when the second serotype accounts for at least this fraction of mapped DENV reads."
+                },
+                "nextclade_dir": {
+                    "type": "string",
+                    "format": "directory-path",
+                    "exists": true,
+                    "description": "Directory of pre-fetched Nextclade datasets (denv1/, denv2/, denv3/, denv4/). When unset, datasets are fetched once per needed serotype."
+                },
+                "nextclade_dataset_tag": {
+                    "type": "string",
+                    "description": "Optional pinned Nextclade dataset tag for reproducible dataset downloads."
+                },
+                "min_completeness": {
+                    "type": "number",
+                    "default": 0.80,
+                    "minimum": 0.0,
+                    "maximum": 1.0,
+                    "description": "Minimum non-N consensus completeness (0-1) required to report a definitive genotype/lineage; below this the genotype is Indeterminate."
+                }
+            }
+        },
+        "fhir_options": {
+            "title": "FHIR output, validation and upload",
+            "type": "object",
+            "fa_icon": "fas fa-notes-medical",
+            "properties": {
+                "fhir_profile": {
+                    "type": "string",
+                    "default": "generic",
+                    "enum": ["generic", "satusehat"],
+                    "description": "FHIR profile: generic (HL7 Genomics Reporting IG 3.0.0) or satusehat (Kemkes extensions/identifiers)."
+                },
+                "fhir_include_sequence": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Embed the masked consensus genome sequence in the genomic FHIR Bundle."
+                },
+                "performer_org_id": {
+                    "type": "string",
+                    "description": "FHIR id of the performing laboratory Organization."
+                },
+                "performer_org_name": {
+                    "type": "string",
+                    "description": "Display name of the performing laboratory Organization."
+                },
+                "identifier_system_base": {
+                    "type": "string",
+                    "description": "Base URL for custom resource identifiers in the generic profile."
+                },
+                "patient_metadata": {
+                    "type": "string",
+                    "format": "file-path",
+                    "exists": true,
+                    "description": "Clinical metadata CSV/XLSX (triggers clinical and linked transaction FHIR bundles)."
+                },
+                "organization_metadata": {
+                    "type": "string",
+                    "format": "file-path",
+                    "exists": true,
+                    "description": "Organization metadata CSV/XLSX."
+                },
+                "practitioner_metadata": {
+                    "type": "string",
+                    "format": "file-path",
+                    "exists": true,
+                    "description": "Practitioner metadata CSV/XLSX."
+                },
+                "external_refs": {
+                    "type": "string",
+                    "format": "file-path",
+                    "exists": true,
+                    "description": "JSON mapping sample FHIR id to pre-existing server resource ids."
+                },
+                "require_clinical": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Fail if any sample lacks a clinical metadata row."
+                },
+                "bundle_request_method": {
+                    "type": "string",
+                    "default": "PUT",
+                    "enum": ["PUT", "POST"],
+                    "description": "HTTP method for transaction bundle entries."
+                },
+                "publish_clinical": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Publish intermediate fhir/clinical/ directory."
+                },
+                "skip_fhir_validation": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Skip HL7 FHIR validator step."
+                },
+                "fhir_validator": {
+                    "type": "string",
+                    "description": "Path or URL to HL7 validator_cli.jar."
+                },
+                "fhir_ig": {
+                    "type": "string",
+                    "default": "hl7.fhir.uv.genomics-reporting#3.0.0",
+                    "description": "HL7 FHIR Implementation Guide package."
+                },
+                "fhir_tx_server": {
+                    "type": "string",
+                    "default": "n/a",
+                    "description": "FHIR terminology server URL, or n/a for offline validation."
+                },
+                "fail_on_validation_error": {
+                    "type": "boolean",
+                    "description": "Fail the pipeline if any FHIR bundle reports validation errors."
+                },
+                "fhir_validation_batch_size": {
+                    "type": "integer",
+                    "default": 50,
+                    "minimum": 1,
+                    "description": "Number of FHIR JSON files validated per validator JVM invocation."
+                },
+                "fhir_server_url": {
+                    "type": "string",
+                    "description": "FHIR server base URL; when set, linked bundles are uploaded using Nextflow secrets."
+                },
+                "fhir_auth_url": {
+                    "type": "string",
+                    "description": "OAuth2/OIDC realm base URL for client_credentials token exchange."
+                },
+                "fhir_upload_api_key": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Also pass DENVFHIR_API_KEY secret as X-Api-Key header on upload."
+                }
+            }
+        },
+        "resource_options": {
+            "title": "Max job request options",
+            "type": "object",
+            "fa_icon": "fas fa-server",
+            "properties": {
+                "max_cpus": {
+                    "type": "integer",
+                    "default": 8,
+                    "minimum": 1,
+                    "description": "Maximum CPUs per process."
+                },
+                "max_memory": {
+                    "type": "string",
+                    "default": "16 GB",
+                    "description": "Maximum memory per process."
+                },
+                "max_time": {
+                    "type": "string",
+                    "default": "24h",
+                    "description": "Maximum wall time per process."
+                },
+                "trace_report_suffix": {
+                    "type": "string",
+                    "hidden": true,
+                    "description": "Timestamp suffix for pipeline_info reports."
+                }
+            }
+        }
+    },
+    "allOf": [
+        { "$ref": "#/$defs/input_output_options" },
+        { "$ref": "#/$defs/reference_options" },
+        { "$ref": "#/$defs/read_processing_options" },
+        { "$ref": "#/$defs/typing_options" },
+        { "$ref": "#/$defs/fhir_options" },
+        { "$ref": "#/$defs/resource_options" }
+    ]
+}

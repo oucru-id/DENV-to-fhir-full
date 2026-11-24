@@ -1,1 +1,0 @@
-put sequencing fastq here
