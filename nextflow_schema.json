@@ -147,6 +147,12 @@
                     "default": 20,
                     "minimum": 0,
                     "description": "Minimum VCF QUAL score for consensus variant inclusion."
+                },
+                "mpileup_max_depth": {
+                    "type": "integer",
+                    "default": 10000,
+                    "minimum": 100,
+                    "description": "Maximum per-position read depth used by bcftools mpileup for Illumina haploid variant calling."
                 }
             }
         },
@@ -163,9 +169,9 @@
                 },
                 "coinfection_min_fraction": {
                     "type": "number",
-                    "default": 0.10,
+                    "default": 0.1,
                     "minimum": 0.01,
-                    "maximum": 0.50,
+                    "maximum": 0.5,
                     "description": "Flag possible mixed-serotype co-infection when the second serotype accounts for at least this fraction of mapped DENV reads."
                 },
                 "nextclade_dir": {
@@ -180,7 +186,7 @@
                 },
                 "min_completeness": {
                     "type": "number",
-                    "default": 0.80,
+                    "default": 0.8,
                     "minimum": 0.0,
                     "maximum": 1.0,
                     "description": "Minimum non-N consensus completeness (0-1) required to report a definitive genotype/lineage; below this the genotype is Indeterminate."
@@ -195,7 +201,10 @@
                 "fhir_profile": {
                     "type": "string",
                     "default": "generic",
-                    "enum": ["generic", "satusehat"],
+                    "enum": [
+                        "generic",
+                        "satusehat"
+                    ],
                     "description": "FHIR profile: generic (HL7 Genomics Reporting IG 3.0.0) or satusehat (Kemkes extensions/identifiers)."
                 },
                 "fhir_include_sequence": {
@@ -247,7 +256,10 @@
                 "bundle_request_method": {
                     "type": "string",
                     "default": "PUT",
-                    "enum": ["PUT", "POST"],
+                    "enum": [
+                        "PUT",
+                        "POST"
+                    ],
                     "description": "HTTP method for transaction bundle entries."
                 },
                 "publish_clinical": {
@@ -329,11 +341,23 @@
         }
     },
     "allOf": [
-        { "$ref": "#/$defs/input_output_options" },
-        { "$ref": "#/$defs/reference_options" },
-        { "$ref": "#/$defs/read_processing_options" },
-        { "$ref": "#/$defs/typing_options" },
-        { "$ref": "#/$defs/fhir_options" },
-        { "$ref": "#/$defs/resource_options" }
+        {
+            "$ref": "#/$defs/input_output_options"
+        },
+        {
+            "$ref": "#/$defs/reference_options"
+        },
+        {
+            "$ref": "#/$defs/read_processing_options"
+        },
+        {
+            "$ref": "#/$defs/typing_options"
+        },
+        {
+            "$ref": "#/$defs/fhir_options"
+        },
+        {
+            "$ref": "#/$defs/resource_options"
+        }
     ]
 }

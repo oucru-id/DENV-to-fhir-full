@@ -15,7 +15,7 @@ process CALL_VARIANTS_ILLUMINA {
     """
     bcftools mpileup \\
         -a FORMAT/AD,FORMAT/DP \\
-        -d 1000000 \\
+        -d ${params.mpileup_max_depth} \\
         -Q 20 \\
         -q 20 \\
         -f ${reference} \\

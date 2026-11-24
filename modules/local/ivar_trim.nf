@@ -20,19 +20,32 @@ process IVAR_TRIM {
     """
     BED=""
     if [ -d "${primer_bed}" ]; then
-        for cand in "${primer_bed}/${serotype}.bed" "${primer_bed}/${sero_nodash}.bed" "${primer_bed}/${serotype.toLowerCase()}.bed" "${primer_bed}/${sero_nodash.toLowerCase()}.bed"; do
-            if [ -f "\$cand" ]; then
+        REF_ACC=\$(head -n 1 "${reference}" | sed 's/^>//' | awk '{print \$1}')
+        for cand in "${primer_bed}"/*.bed; do
+            [ -f "\$cand" ] || continue
+            FIRST_CHROM=\$(awk 'NF>=3 && \$1 !~ /^#/ {print \$1; exit}' "\$cand")
+            if [ "\$FIRST_CHROM" = "\$REF_ACC" ]; then
                 BED="\$cand"
                 break
             fi
         done
         if [ -z "\$BED" ]; then
-            echo "ERROR: no primer BED for serotype ${serotype} in ${primer_bed}" >&2
+            for cand in "${primer_bed}/${serotype}.bed" "${primer_bed}/${sero_nodash}.bed" "${primer_bed}/${serotype.toLowerCase()}.bed" "${primer_bed}/${sero_nodash.toLowerCase()}.bed"; do
+                if [ -f "\$cand" ]; then
+                    BED="\$cand"
+                    break
+                fi
+            done
+        fi
+        if [ -z "\$BED" ]; then
+            echo "ERROR: no primer BED matching reference \$REF_ACC or serotype ${serotype} in ${primer_bed}" >&2
             exit 1
         fi
     else
         BED="${primer_bed}"
     fi
+
+    echo "Using primer BED: \$BED"
 
     ivar trim \\
         -b "\$BED" \\

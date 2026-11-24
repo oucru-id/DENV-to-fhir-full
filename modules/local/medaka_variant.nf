@@ -31,8 +31,9 @@ process MEDAKA_VARIANT {
     fi
 
     bcftools norm -f reference.fasta -m -any medaka.annotated.vcf -Ou \\
+    | bcftools view -v snps,indels -i 'GT="1" || GT="1/1" || GT="0/1"' -Ou \\
     | bcftools filter \\
-        -i "INFO/DP>=${params.consensus_min_depth} && QUAL>=${params.variant_min_quality}" \\
+        -i "INFO/DP>=${params.consensus_min_depth} && (QUAL>=${params.variant_min_quality} || FORMAT/GQ>=${params.variant_min_quality})" \\
         -Oz -o ${meta.id}.filtered.vcf.gz
 
     bcftools index -t ${meta.id}.filtered.vcf.gz
