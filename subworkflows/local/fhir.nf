@@ -7,10 +7,10 @@ include { asFlag; asInt                          } from './utils_params'
 
 workflow FHIR {
     take:
-    consensus       // [meta, fasta]
-    serotype_json   // [meta, serotype.json]
-    genotype_json   // [meta, genotype.json]
-    coverage_json   // [meta, coverage.json]
+    consensus      
+    serotype_json  
+    genotype_json 
+    coverage_json  
     no_file
 
     main:
