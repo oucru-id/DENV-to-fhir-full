@@ -1,0 +1,44 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://raw.githubusercontent.com/oucru-id/DENV-to-fhir-full/main/assets/schema_input.json",
+    "title": "DENVtoFHIR samplesheet",
+    "description": "One row per sample: sample,platform,fastq_1,fastq_2,fasta",
+    "type": "array",
+    "items": {
+        "type": "object",
+        "properties": {
+            "sample": {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,39}$",
+                "errorMessage": "sample: 1-40 letters, digits, '.', '_' or '-', starting with a letter or digit",
+                "meta": ["id"]
+            },
+            "platform": {
+                "type": "string",
+                "enum": ["illumina", "ont", "fasta"],
+                "errorMessage": "platform must be illumina, ont or fasta",
+                "meta": ["platform"]
+            },
+            "fastq_1": {
+                "type": "string",
+                "format": "file-path",
+                "pattern": "^\\S+\\.f(ast)?q\\.gz$",
+                "errorMessage": "fastq_1 must be a gzipped FASTQ (.fastq.gz / .fq.gz) without spaces"
+            },
+            "fastq_2": {
+                "type": "string",
+                "format": "file-path",
+                "pattern": "^\\S+\\.f(ast)?q\\.gz$",
+                "errorMessage": "fastq_2 must be a gzipped FASTQ (.fastq.gz / .fq.gz) without spaces"
+            },
+            "fasta": {
+                "type": "string",
+                "format": "file-path",
+                "pattern": "^\\S+\\.(fasta|fa|fna)(\\.gz)?$",
+                "errorMessage": "fasta must be a consensus FASTA ending in .fasta, .fa or .fna (optionally .gz)"
+            }
+        },
+        "required": ["sample", "platform"]
+    },
+    "uniqueEntries": ["sample"]
+}

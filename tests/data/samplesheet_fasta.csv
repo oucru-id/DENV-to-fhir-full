@@ -1,0 +1,5 @@
+sample,platform,fastq_1,fastq_2,fasta
+DENV1_REF,fasta,,,data/references/NC_0014771.fasta
+DENV2_REF,fasta,,,data/references/NC_0014742.fasta
+DENV3_REF,fasta,,,data/references/NC_0014752.fasta
+DENV4_REF,fasta,,,data/references/NC_0026401.fasta

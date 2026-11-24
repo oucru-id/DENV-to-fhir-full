@@ -1,0 +1,22 @@
+{
+  "resourceType": "CodeSystem",
+  "id": "denv-serotype",
+  "url": "http://terminology.spheres.id/CodeSystem/denv-serotype",
+  "version": "2.0.0",
+  "name": "DenvSerotype",
+  "title": "Dengue virus serotypes",
+  "status": "active",
+  "experimental": false,
+  "publisher": "OUCRU Indonesia - DENVtoFHIR",
+  "description": "Dengue virus serotype calls produced by DENVtoFHIR.",
+  "caseSensitive": true,
+  "content": "complete",
+  "count": 5,
+  "concept": [
+    { "code": "DENV-1", "display": "Dengue virus serotype 1" },
+    { "code": "DENV-2", "display": "Dengue virus serotype 2" },
+    { "code": "DENV-3", "display": "Dengue virus serotype 3" },
+    { "code": "DENV-4", "display": "Dengue virus serotype 4" },
+    { "code": "unknown", "display": "Unknown serotype" }
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "resourceType": "CodeSystem",
+  "id": "denv-lineage",
+  "url": "http://terminology.spheres.id/CodeSystem/denv-lineage",
+  "version": "2.0.0",
+  "name": "DenvLineage",
+  "title": "Dengue virus Nextclade lineage nomenclature",
+  "status": "active",
+  "experimental": false,
+  "publisher": "OUCRU Indonesia - DENVtoFHIR",
+  "description": "Structured Dengue virus genotype and lineage codes as reported by Nextclade (Hill et al. 2024 nomenclature, e.g. 1V_D.1.1, 2III_C.2, 3III_B.3.2, 4II_B.2).",
+  "caseSensitive": true,
+  "content": "not-present"
+}

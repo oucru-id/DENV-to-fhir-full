@@ -1,0 +1,54 @@
+# Nextflow
+work/
+results/
+.nextflow/
+.nextflow.log*
+.nextflow.pid
+timeline*.html
+report*.html
+trace*.txt
+dag*.html
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+venv/
+.venv/
+
+# Site-specific inputs: clinical metadata, credentials and sequencing data
+data/*.csv
+data/*.xlsx
+data/*.db
+data/NGS/
+*.bak
+*.db
+access_token.json
+input_sso.json
+*.secret
+site*.yaml
+site*.json
+.env
+
+# Reference databases fetched at run time
+db/nextclade/
+db/hostile/
+
+# Pipeline outputs
+*.fhir.json
+!tests/**/*.fhir.json
+
+# Tools
+tools/*.jar
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Test-profile and archived outputs
+results_test/
+results_test_*/
+results_pre_fix_*/

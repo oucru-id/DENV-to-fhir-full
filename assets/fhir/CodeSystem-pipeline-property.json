@@ -1,0 +1,23 @@
+{
+  "resourceType": "CodeSystem",
+  "id": "pipeline-property",
+  "url": "http://terminology.spheres.id/CodeSystem/pipeline-property",
+  "version": "2.0.0",
+  "name": "PipelineProperty",
+  "title": "DENVtoFHIR pipeline properties",
+  "status": "active",
+  "experimental": false,
+  "publisher": "OUCRU Indonesia - DENVtoFHIR",
+  "description": "Device.property types recording how DENVtoFHIR was configured.",
+  "caseSensitive": true,
+  "content": "complete",
+  "count": 6,
+  "concept": [
+    { "code": "source-repository", "display": "Source repository" },
+    { "code": "consensus-min-depth", "display": "Minimum depth for consensus masking" },
+    { "code": "consensus-min-af", "display": "Minimum allele fraction for haploid consensus calling" },
+    { "code": "variant-min-quality", "display": "Minimum variant quality (QUAL)" },
+    { "code": "min-completeness", "display": "Minimum consensus completeness for genotyping" },
+    { "code": "primer-trimmed", "display": "Amplicon primer trimming applied" }
+  ]
+}

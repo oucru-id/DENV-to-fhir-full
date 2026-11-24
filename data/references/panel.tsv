@@ -1,0 +1,7 @@
+accession	fasta	serotype	sylvatic	nextclade_dataset	description
+NC_001477.1	NC_0014771.fasta	DENV-1	false	community/v-gen-lab/dengue/denv1	Dengue virus 1 RefSeq
+NC_001474.2	NC_0014742.fasta	DENV-2	false	community/v-gen-lab/dengue/denv2	Dengue virus 2 RefSeq
+NC_001475.2	NC_0014752.fasta	DENV-3	false	community/v-gen-lab/dengue/denv3	Dengue virus 3 RefSeq
+NC_002640.1	NC_0026401.fasta	DENV-4	false	community/v-gen-lab/dengue/denv4	Dengue virus 4 RefSeq
+EF105380.1	EF105380.fasta	DENV-2	true	community/v-gen-lab/dengue/denv2	Dengue virus 2 sylvatic (Dak Ar 578)
+JF262780.1	JF262780.fasta	DENV-4	true	community/v-gen-lab/dengue/denv4	Dengue virus 4 sylvatic (P73-1120)

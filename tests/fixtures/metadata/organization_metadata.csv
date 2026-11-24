@@ -1,0 +1,3 @@
+# SYNTHETIC test metadata - not real organization data
+org_id,name,alias,type_code,type_display,type_text,phone,email,address_line,city,state,country,province_code,city_code,district_code,latitude,longitude
+99000001,SPHERES Synthetic Reference Lab,SPHERES-LAB,lab,Laboratory,Genomics Reference Laboratory,+62210000000,lab@example.org,Jl. Contoh Lab 1,Jakarta,DKI Jakarta,ID,31,3171,317101,-6.2000,106.8167
