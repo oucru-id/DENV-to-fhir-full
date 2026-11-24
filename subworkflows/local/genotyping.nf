@@ -4,10 +4,10 @@ include { PARSE_NEXTCLADE       } from '../../modules/local/parse_nextclade'
 
 workflow GENOTYPING {
     take:
-    consensus       // [meta, fasta]
-    serotype_json   // [meta, serotype.json]
-    assignment      // [meta, serotype, ref_file, dataset_name]
-    coverage_json   // [meta, coverage.json]
+    consensus      
+    serotype_json   
+    assignment    
+    coverage_json   
     no_file
 
     main:
