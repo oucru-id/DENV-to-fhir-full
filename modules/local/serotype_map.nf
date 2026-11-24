@@ -21,7 +21,7 @@ process SEROTYPE_MAP {
         """
         TOTAL_INPUT_READS=\$(grep -c '^>' ${read_file} || echo 0)
         if [ "\$TOTAL_INPUT_READS" -gt 0 ]; then
-            minimap2 -x ${mm2_preset} --secondary=no -t ${task.cpus} \\
+            minimap2 -c -x ${mm2_preset} --secondary=no -t ${task.cpus} \\
                 ${panel_index} ${read_file} > ${meta.id}.minimap2.paf || touch ${meta.id}.minimap2.paf
         else
             : > ${meta.id}.minimap2.paf
@@ -43,7 +43,7 @@ process SEROTYPE_MAP {
 
         TOTAL_INPUT_READS=\$(( \$(wc -l < subset.fastq) / 4 ))
         if [ "\$TOTAL_INPUT_READS" -gt 0 ]; then
-            minimap2 -x ${mm2_preset} --secondary=no -t ${task.cpus} \\
+            minimap2 -c -x ${mm2_preset} --secondary=no -t ${task.cpus} \\
                 ${panel_index} subset.fastq > ${meta.id}.minimap2.paf || touch ${meta.id}.minimap2.paf
         else
             : > ${meta.id}.minimap2.paf
