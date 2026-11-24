@@ -15,6 +15,7 @@ process MEDAKA_VARIANT {
     """
     cp -L ${reference} reference.fasta
     samtools faidx reference.fasta
+    export HOME="\$PWD"
     export CUDA_VISIBLE_DEVICES=""
 
     medaka inference ${bam} consensus_probs.hdf \\
